@@ -44,9 +44,9 @@
 %%------------------------------------------------------------------------------
 -spec start(esockd_connection:connection(), pos_integer(), any()) ->
     {ok, keepalive()} | {error, any()}.
-start(Connection, TimeoutSec, TimeoutMsg) when TimeoutSec > 0 ->
+start(Connection, TimeoutSec, TimeoutMsg) when TimeoutSec > 0 -> %初始化keepalive
     with_sock_stats(Connection, fun(RecvOct) ->
-        Ms = timer:seconds(TimeoutSec),
+        Ms = timer:seconds(TimeoutSec),%定义好超时时间
         Ref = erlang:send_after(Ms, self(), TimeoutMsg),
         {ok, #keepalive {connection   = Connection,
                          recv_oct     = RecvOct,
@@ -66,7 +66,7 @@ resume(KeepAlive = #keepalive {connection   = Connection,
                                timeout_msg  = TimeoutMsg,
                                timer_ref    = Ref}) ->
     with_sock_stats(Connection, fun(NewRecvOct) ->
-        case NewRecvOct =:= RecvOct of
+        case NewRecvOct =:= RecvOct of%如果前后两次接收到的数据量相等,那么说明在超时时间内没有接收到任何数据,因此超时了
             false ->
                 cancel(Ref), %% need?
                 NewRef = erlang:send_after(Ms, self(), TimeoutMsg),

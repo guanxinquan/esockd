@@ -21,7 +21,7 @@
 %%%-----------------------------------------------------------------------------
 %%% @doc
 %%% eSockd Listener.
-%%%
+%%% 这个是管理者,用于在开始的时候创建多个异步listener
 %%% @end
 %%%-----------------------------------------------------------------------------
 -module(esockd_listener).
@@ -59,13 +59,13 @@ start_link(Protocol, Port, Options, AcceptorSup, Logger) ->
 init({Protocol, Port, Options, AcceptorSup, Logger}) ->
     process_flag(trap_exit, true),
     %%don't active the socket...
-    SockOpts = proplists:get_value(sockopts, Options, [{reuseaddr, true}]),
-    case esockd_transport:listen(Port, [{active, false} | proplists:delete(active, SockOpts)]) of
+    SockOpts = proplists:get_value(sockopts, Options, [{reuseaddr, true}]),%%强制将reuseaddr设置成true
+    case esockd_transport:listen(Port, [{active, false} | proplists:delete(active, SockOpts)]) of%%强制active设置成false
         {ok, LSock} ->
-            SockFun = esockd_transport:ssl_upgrade_fun(proplists:get_value(ssl, Options)),
-			AcceptorNum = proplists:get_value(acceptors, Options, ?ACCEPTOR_POOL),
+            SockFun = esockd_transport:ssl_upgrade_fun(proplists:get_value(ssl, Options)),%%这个fun是用于处理ssl的
+			AcceptorNum = proplists:get_value(acceptors, Options, ?ACCEPTOR_POOL),%%定义需要多少个accptor
 			lists:foreach(fun (_) ->
-				{ok, _APid} = esockd_acceptor_sup:start_acceptor(AcceptorSup, LSock, SockFun)
+				{ok, _APid} = esockd_acceptor_sup:start_acceptor(AcceptorSup, LSock, SockFun)%%启动AcceptorNum个acceptor
 			end, lists:seq(1, AcceptorNum)),
             {ok, {LIPAddress, LPort}} = inet:sockname(LSock),
             io:format("~s listen on ~s:~p with ~p acceptors.~n",

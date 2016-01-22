@@ -51,7 +51,7 @@ hostname() ->
         {error, _Reason}                 -> Hostname
     end.
 
-format(sockname, SockName) ->
+format(sockname, SockName) ->%{Ip,Port},格式化成可读模式
     format(SockName);
 format(peername, PeerName) ->
     format(PeerName).

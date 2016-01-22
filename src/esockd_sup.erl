@@ -42,7 +42,8 @@
 -define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
 
 %%%=============================================================================
-%%% API
+%%% API 启动两中类型的child,一种是esocketd_server,用于状态统计,一种是esocked_listener_sup,用于监听socket,
+%%% 其中listerner对应多个child,每个child根据Listner,Port唯一定位
 %%%=============================================================================
 
 %%------------------------------------------------------------------------------
@@ -55,7 +56,7 @@ start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 %%------------------------------------------------------------------------------
-%% @doc Start a listener.
+%% @doc Start a listener. 启动一个esocket_listener_sup,并且配置指定的参数
 %% @end
 %%------------------------------------------------------------------------------
 -spec start_listener(Protocol, Port, Options, MFArgs) -> {ok, pid()} when
@@ -71,7 +72,7 @@ start_listener(Protocol, Port, Options, MFArgs) ->
 	supervisor:start_child(?MODULE, ChildSpec).
 
 %%------------------------------------------------------------------------------
-%% @doc Stop the listener.
+%% @doc Stop the listener. 终止一个协议的运行
 %% @end
 %%------------------------------------------------------------------------------
 -spec stop_listener(Protocol, Port) -> ok | {error, any()} when
@@ -87,7 +88,7 @@ stop_listener(Protocol, Port) ->
 	end.
 
 %%------------------------------------------------------------------------------
-%% @doc Get Listeners.
+%% @doc Get Listeners.获取所有协议的Id{Protocol,Port}和对应的Pid列表
 %% @end
 %%------------------------------------------------------------------------------
 -spec listeners() -> [{term(), pid()}].
@@ -95,7 +96,7 @@ listeners() ->
     [{Id, Pid} || {{listener_sup, Id}, Pid, supervisor, _} <- supervisor:which_children(?MODULE)].
 
 %%------------------------------------------------------------------------------
-%% @doc Get listener pid.
+%% @doc Get listener pid.,在外部看,协议和端口号能够唯一定位一个processId,这个接口获取对应的pid
 %% @end
 %%------------------------------------------------------------------------------
 -spec listener({atom(), inet:port_number()}) -> undefined | pid().
@@ -108,7 +109,7 @@ listener({Protocol, Port}) ->
 
 
 %%%=============================================================================
-%%% Supervisor callbacks
+%%% Supervisor callbacks,初始化时,只初始化了esockd_server,通过start_listener增加更多的Protocol和Port
 %%%=============================================================================
 
 init([]) ->
@@ -120,7 +121,7 @@ init([]) ->
 
 %%------------------------------------------------------------------------------
 %% @private
-%% @doc Listener Child Id.
+%% @doc Listener Child Id.,child Id是由协议和端口号共同组成的
 %% @end
 %%------------------------------------------------------------------------------
 child_id({Protocol, Port}) ->

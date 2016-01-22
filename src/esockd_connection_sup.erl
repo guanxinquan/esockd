@@ -21,8 +21,8 @@
 %%%-----------------------------------------------------------------------------
 %%% @doc
 %%% eSockd connection supervisor. As you know, I love process dictionary...
-%%% Notice: Some code is copied from OTP supervisor.erl.
-%%%
+%%% Notice: Some code is copied from OTP supervisor.erl.用于启动connection,调用用户
+%%% 的进程,和统计信息,黑白名单
 %%% @end
 %%%-----------------------------------------------------------------------------
 
@@ -77,38 +77,42 @@ start_link(Options, MFArgs, Logger) ->
 
 %%------------------------------------------------------------------------------
 %% @doc Start connection.
+%% Sup是esockd_connection_sup的实例
+%% Mod参数应当是inet_tcp,这个mod是通过inet_db:lookup_socket获取的,
+%% Sock参数是新获取到的连接
+%% SockFun 是用于获取ssl的一个fun,通过这个fun可以获取sslSocket
 %% @end
 %%------------------------------------------------------------------------------
 start_connection(Sup, Mod, Sock, SockFun) ->
-    case call(Sup, {start_connection, Sock, SockFun}) of
+    case call(Sup, {start_connection, Sock, SockFun}) of%%启动连接(验证最大连接数,白名单,调用用户的启动function
         {ok, Pid, Conn} ->
             % transfer controlling from acceptor to connection
-            Mod:controlling_process(Sock, Pid),
-            Conn:go(Pid),
+            Mod:controlling_process(Sock, Pid),%将控制权转交给子进程
+            Conn:go(Pid),%释放wait(如果客户端调用了wait,那么客户端会接收到信号继续执行
             {ok, Pid};
         {error, Error} ->
             {error, Error}
     end.
 
-count_connections(Sup) ->
+count_connections(Sup) ->%当前正在连接的数量
 	call(Sup, count_connections).
 
-get_max_clients(Sup) when is_pid(Sup) ->
+get_max_clients(Sup) when is_pid(Sup) ->%系统中支持的最大连接数
     call(Sup, get_max_clients).
 
 set_max_clients(Sup, MaxClients) when is_pid(Sup) ->
     call(Sup, {set_max_clients, MaxClients}).
 
-get_shutdown_count(Sup) ->
+get_shutdown_count(Sup) ->%已经成功断开连接的连接数
     call(Sup, get_shutdown_count).
 
-access_rules(Sup) ->
+access_rules(Sup) ->%连接过滤规则
     call(Sup, access_rules).
 
-allow(Sup, CIDR) ->
+allow(Sup, CIDR) ->%白名单
     call(Sup, {add_rule, {allow, CIDR}}).
 
-deny(Sup, CIDR) ->
+deny(Sup, CIDR) ->%黑名单
     call(Sup, {add_rule, {deny, CIDR}}).
 
 call(Sup, Req) ->
@@ -134,7 +138,7 @@ init([Options, MFArgs, Logger]) ->
 
 handle_call({start_connection, _Sock, _SockFun}, _From,
             State = #state{curr_clients = CurrClients, max_clients = MaxClients})
-        when CurrClients >= MaxClients ->
+        when CurrClients >= MaxClients -> %%如果超过最大限制,那么拒绝连接
     {reply, {error, maxlimit}, State};
 
 handle_call({start_connection, Sock, SockFun}, _From, 
@@ -142,12 +146,12 @@ handle_call({start_connection, Sock, SockFun}, _From,
                            curr_clients = Count, access_rules = Rules}) ->
     case inet:peername(Sock) of
         {ok, {Addr, _Port}} ->
-            case allowed(Addr, Rules) of
+            case allowed(Addr, Rules) of%白名单
                 true ->
-                    Conn = esockd_connection:new(Sock, SockFun, ConnOpts),
+                    Conn = esockd_connection:new(Sock, SockFun, ConnOpts),%Conn实际上是{esockd_connection,Sock,SockFun,ConnOpts}的一个封装
                     case catch Conn:start_link(MFArgs) of
                         {ok, Pid} when is_pid(Pid) ->
-                            put(Pid, true),
+                            put(Pid, true),%将Pid和true放入进程字典中,以备后期process执行完成时,能够减少连接数那个统计值
                             {reply, {ok, Pid, Conn}, State#state{curr_clients = Count+1}};
                         ignore ->
                             {reply, ignore, State};

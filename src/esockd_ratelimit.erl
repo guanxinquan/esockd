@@ -46,7 +46,7 @@
 -export_type([ratelimit/0]).
 
 %%------------------------------------------------------------------------------
-%% @doc Create rate limiter bucket.
+%% @doc Create rate limiter bucket. 限速,如果太快了,就pause一段时间
 %% @end
 %%------------------------------------------------------------------------------
 -spec new(pos_integer(), pos_integer()) -> ratelimit().
@@ -59,7 +59,7 @@ new(Capacity, Rate) when Capacity > Rate andalso Rate > 0 ->
 %% @doc Check inflow bytes.
 %% @end
 %%------------------------------------------------------------------------------
--spec check(bucket(), pos_integer()) -> {non_neg_integer(), ratelimit()}.
+-spec check(bucket(), pos_integer()) -> {non_neg_integegitr(), ratelimit()}.
 check(Bytes, {?MODULE, [Bucket = #bucket{capacity = Capacity, remaining = Remaining,
                                          limitrate = Rate, lastime = Lastime}]}) ->
     Tokens = lists:min([Capacity, Remaining + round(Rate * (now_ms() - Lastime))]),
@@ -71,7 +71,7 @@ check(Bytes, {?MODULE, [Bucket = #bucket{capacity = Capacity, remaining = Remain
             Pause = round((Bytes - Tokens)/Rate),
             {Pause, Bucket#bucket{remaining = 0, lastime = now_ms() + Pause}}
     end,
-    {Pause1, {?MODULE, [NewBucket]}}.
+    {Pause1, {?MODULE, [NewBucket]}}.%返回的结果包含一个等待时间和一个回调
 
 now_ms() ->
     {MegaSecs, Secs, MicroSecs} = os:timestamp(),

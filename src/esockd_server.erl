@@ -20,8 +20,8 @@
 %%% SOFTWARE.
 %%%-----------------------------------------------------------------------------
 %%% @doc
-%%% eSockd Server.
-%%%
+%%% eSockd Server.这实际上是封装了一个使用ets存储统计信息的一个统计,统计使用protocol,port+统计量的名字
+%%% 作为key,数值作为value.可以获取指定protocol+port对应的所有统计量的值,也可以获取,增加或者减少某个统计量的值
 %%% @end
 %%%-----------------------------------------------------------------------------
 -module(esockd_server).
@@ -62,7 +62,7 @@ start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 %%------------------------------------------------------------------------------
-%% @doc New Stats Fun.
+%% @doc New Stats Fun.创建一个stats函数,这个函数有两种参数,一种是对某种属性增加一定数量,一种是对某种属性减少一定数量,在实际存储中,使用的是ets
 %% @end
 %%------------------------------------------------------------------------------
 -spec stats_fun({atom(), inet:port_number()}, atom()) -> fun().
@@ -73,7 +73,7 @@ stats_fun({Protocol, Port}, Metric) ->
     end.
 
 %%------------------------------------------------------------------------------
-%% @doc Get Stats.
+%% @doc Get Stats.获取某个portocol和port的所有统计属性
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_stats({atom(), inet:port_number()}) -> [{atom(), non_neg_integer()}].
@@ -82,7 +82,7 @@ get_stats({Protocol, Port}) ->
                       <- ets:match(?STATS_TAB, {{{Protocol, Port}, '$1'}, '$2'})].
 
 %%------------------------------------------------------------------------------
-%% @doc Inc Stats.
+%% @doc Inc Stats.对某个protocol,port的某项属性增加一定量的值
 %% @end
 %%------------------------------------------------------------------------------
 -spec inc_stats({atom(), inet:port_number()}, atom(), pos_integer()) -> any().
@@ -90,7 +90,7 @@ inc_stats({Protocol, Port}, Metric, Num) when is_integer(Num) ->
     update_counter({{Protocol, Port}, Metric}, Num).
     
 %%------------------------------------------------------------------------------
-%% @doc Dec Stats.
+%% @doc Dec Stats.对某个protocol,port的某项属性减少一定量的值
 %% @end
 %%------------------------------------------------------------------------------
 -spec dec_stats({atom(), inet:port_number()}, atom(), pos_integer()) -> any().
@@ -99,7 +99,7 @@ dec_stats({Protocol, Port}, Metric, Num) when is_integer(Num) ->
 
 %%------------------------------------------------------------------------------
 %% @private
-%% @doc Update stats counter.
+%% @doc Update stats counter.对value进行一个number的操作
 %% @end
 %%------------------------------------------------------------------------------
 update_counter(Key, Num) ->
@@ -129,6 +129,7 @@ init([]) ->
     ets:new(?STATS_TAB, [set, public, named_table, {write_concurrency, true}]),
     {ok, #state{}}.
 
+%%将Protocol,Port和Metric三个属性做为key,value实际上是一个计数
 handle_call({init, {Protocol, Port}, Metric}, _From, State) ->
     Key = {{Protocol, Port}, Metric},
     ets:insert(?STATS_TAB, {Key, 0}),

@@ -48,6 +48,8 @@ start_link(ConnSup, AcceptStatsFun, BufferTuneFun, Logger) ->
 
 %%------------------------------------------------------------------------------
 %% @doc Start a acceptor.
+
+
 %% @end
 %%------------------------------------------------------------------------------
 -spec start_acceptor(AcceptorSup, LSock, SockFun) -> {ok, pid()} | {error, any()} | ignore when

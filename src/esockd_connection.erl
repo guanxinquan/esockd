@@ -61,6 +61,9 @@
 new(Sock, SockFun, Opts) ->
     {?MODULE, [Sock, SockFun, parse_opt(Opts)]}.
 
+
+%%parse_opt主要处理rate_limit参数,rate_limit参数在配置时,应当有两个前面一个是capcity,后面一个是rate中间用逗号隔开
+%%分析结束之后,rate_limit参数就变成了{esocket_ratelimit,Bucket}
 parse_opt(Opts) ->
     parse_opt(Opts, []).
 parse_opt([], Acc) ->
@@ -75,7 +78,7 @@ parse_rl(Str) ->
     esockd_ratelimit:new(Burst, Rate).
 
 %%------------------------------------------------------------------------------
-%% @doc Start the connection process.
+%% @doc Start the connection process. 执行用户自定义的Moudule和Function
 %% @end
 %%------------------------------------------------------------------------------
 -spec start_link(esockd:mfargs(), connection()) -> {ok, pid()}
@@ -94,6 +97,7 @@ start_link({M, F, Args}, Conn = ?CONN_MOD)
 %%------------------------------------------------------------------------------
 %% @doc Tell the connection proccess that socket is ready.
 %%      Called by acceptor.
+%% 将socket的控制权交给用户进程后,调用这个接口,通知用户,socket准备好了,可以处理数据
 %% @end
 %%------------------------------------------------------------------------------
 -spec go(pid(), connection()) -> any().
@@ -103,6 +107,7 @@ go(Pid, Conn = ?CONN_MOD) ->
 %%------------------------------------------------------------------------------
 %% @doc Connection process wait for 'go' and upgrade self.
 %%      Called by connection process.
+%% 用户在process创建成功之后,调用这个wait,将等待连接处理成功,这个连接处理主要是等待sup进程将socket的控制权交给用户进程
 %% @end
 %%------------------------------------------------------------------------------
 -spec wait(connection()) -> {ok, connection()}.
@@ -112,11 +117,12 @@ wait(Conn = ?CONN_MOD) ->
 %%------------------------------------------------------------------------------
 %% @doc Upgrade Socket.
 %%      Called by connection proccess.
+%%      调用socketFun获取新的socket
 %% @end
 %%------------------------------------------------------------------------------
 -spec upgrade(connection()) -> {ok, connection()}.
 upgrade({?MODULE, [Sock, SockFun, Opts]}) ->
-    case SockFun(Sock) of
+    case SockFun(Sock) of %sockFun实际用于解决ssl配置ssl_upgrade_fun下面的ssl_upgrade_fun
         {ok, NewSock} ->
             {ok, {?MODULE, [NewSock, SockFun, Opts]}};
         {error, Error} ->
